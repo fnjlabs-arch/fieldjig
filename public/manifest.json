@@ -1,6 +1,6 @@
 {
-    "name": "Midsate Company Portal",
-    "short_name": "Midsate Portal",
+    "name": "SadSha Build",
+    "short_name": "SadSha Build",
     "description": "Mobile workspace for dashboard, timecards, projects, dailies, stock orders, and documents.",
     "start_url": "/mobile/dashboard",
     "display": "standalone",

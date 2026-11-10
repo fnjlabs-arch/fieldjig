@@ -4,8 +4,8 @@ use App\Core\Announcement\Providers\AnnouncementServiceProvider;
 use App\Core\Identity\Providers\FortifyServiceProvider;
 use App\Core\Identity\Providers\UserServiceProvider;
 use App\Core\Scheduler\Providers\SchedulerServiceProvider;
-use App\Providers\VoltServiceProvider;  
 use App\Providers\AppServiceProvider;
+use App\Providers\VoltServiceProvider;
 use Illuminate\Auth\AuthServiceProvider;
 use Illuminate\Auth\Passwords\PasswordResetServiceProvider;
 use Illuminate\Broadcasting\BroadcastServiceProvider;
@@ -43,7 +43,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'SadSha Build'),
 
     /*
     |--------------------------------------------------------------------------

@@ -7,17 +7,17 @@
 @auth
     <meta name="push-authenticated" content="1" />
 @endauth
-<meta name="application-name" content="{{ config('app.name', 'Laravel') }}" />
+<meta name="application-name" content="{{ config('app.name', 'SadSha Build') }}" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'Laravel') }}" />
+<meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'SadSha Build') }}" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#171717" media="(prefers-color-scheme: dark)" />
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
 <meta name="msapplication-TileColor" content="#171717" />
 
 <title>
-    {{ filled($title ?? null) ? $title.' - '.config('app.name', 'Laravel') : config('app.name', 'Laravel') }}
+    {{ filled($title ?? null) ? $title.' - '.config('app.name', 'SadSha Build') : config('app.name', 'SadSha Build') }}
 </title>
 
 <link rel="manifest" href="/manifest.json">

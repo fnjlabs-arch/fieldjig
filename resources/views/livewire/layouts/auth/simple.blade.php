@@ -10,7 +10,7 @@
                     <span class="flex h-16 w-16 mb-1 items-center justify-center">
                         <x-app-logo-icon class="size-16 object-contain" />
                     </span>
-                    <span class="sr-only">{{ config('app.name', 'Laravel') }}</span>
+                    <span class="sr-only">{{ config('app.name', 'SadSha Build') }}</span>
                 </a>
                 <div class="flex flex-col gap-6">
                     {{ $slot }}

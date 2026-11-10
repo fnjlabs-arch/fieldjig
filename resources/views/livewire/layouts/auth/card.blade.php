@@ -11,7 +11,7 @@
                         <x-app-logo-icon class="size-16 object-contain" />
                     </span>
 
-                    <span class="sr-only">{{ config('app.name', 'Laravel') }}</span>
+                    <span class="sr-only">{{ config('app.name', 'SadSha Build') }}</span>
                 </a>
 
                 <div class="flex flex-col gap-6">
