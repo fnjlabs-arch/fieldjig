@@ -1,0 +1,26 @@
+# Shared Caddyfile for the Contabo VPS 8 — BOTH apps, ONE Caddy.
+#
+# This is the file the shared Caddy service (see docker-compose.yml) loads.
+# It does NOT replace Massing's own deploy/Caddyfile: that file describes a
+# standalone Massing deploy (one vhost). On the shared box Massing's Caddy is
+# scaled to 0 and THIS file is the only proxy — see
+# docs/saas/contabo-vps8-shared.md §7. If Massing ever moves off the shared
+# box, its own Caddyfile is the one to use again, untouched.
+#
+# Hostnames are placeholders (TBD) until the real domains are chosen — see
+# FIELDJIG_DOMAIN / MASSING_DOMAIN in .env.example. DNS A records for both
+# names must point at the VPS BEFORE first boot, or Caddy cannot issue
+# certificates (§7 of the guide).
+#
+# The Caddy service runs with network_mode: host (see docker-compose.yml),
+# so 127.0.0.1 here is the VPS itself and both localhost-bound web ports
+# (Massing 8080, Fieldjig 8081) are reachable directly.
+{$MASSING_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:{$MASSING_WEB_PORT:8080}
+}
+
+{$FIELDJIG_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:{$FIELDJIG_WEB_PORT:8081}
+}

@@ -3,6 +3,7 @@
 namespace App\Domains\Projects\Policies;
 
 use App\Core\Identity\Models\User;
+use App\Core\Tenancy\Services\TenantAuthorizer;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Services\ProjectAccessService;
 
@@ -17,6 +18,12 @@ class ProjectPolicy
     public function view(User $user, Project $project): bool
     {
         if (! $user->hasPermission('projects.view')) {
+            return false;
+        }
+
+        // Tenancy gate first: a tenant Admin role must never see another
+        // org's project, even though isAdmin() below includes that role.
+        if (! app(TenantAuthorizer::class)->canAccess($project->organization_id, $user)) {
             return false;
         }
 
@@ -44,6 +51,10 @@ class ProjectPolicy
             return false;
         }
 
+        if (! app(TenantAuthorizer::class)->canAccess($project->organization_id, $user)) {
+            return false;
+        }
+
         if ($user->isAdmin()) {
             return true;
         }
@@ -63,6 +74,10 @@ class ProjectPolicy
             return false;
         }
 
+        if (! app(TenantAuthorizer::class)->canAccess($project->organization_id, $user)) {
+            return false;
+        }
+
         if ($user->isAdmin()) {
             return true;
         }
@@ -79,6 +94,10 @@ class ProjectPolicy
     public function viewFinancials(User $user, Project $project): bool
     {
         if (! $user->hasPermission('projects.view-financials')) {
+            return false;
+        }
+
+        if (! app(TenantAuthorizer::class)->canAccess($project->organization_id, $user)) {
             return false;
         }
 

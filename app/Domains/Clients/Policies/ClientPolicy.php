@@ -3,6 +3,7 @@
 namespace App\Domains\Clients\Policies;
 
 use App\Core\Identity\Models\User;
+use App\Core\Tenancy\Services\TenantAuthorizer;
 use App\Domains\Clients\Models\Client;
 
 class ClientPolicy
@@ -14,7 +15,12 @@ class ClientPolicy
 
     public function view(User $user, Client $client): bool
     {
-        return $user->hasPermission('clients.view');
+        if (! $user->hasPermission('clients.view')) {
+            return false;
+        }
+
+        // Tenancy gate: a tenant Admin role must never see another org's client.
+        return app(TenantAuthorizer::class)->canAccess($client->organization_id, $user);
     }
 
     public function create(User $user): bool
@@ -24,11 +30,19 @@ class ClientPolicy
 
     public function update(User $user, Client $client): bool
     {
-        return $user->hasPermission('clients.edit');
+        if (! $user->hasPermission('clients.edit')) {
+            return false;
+        }
+
+        return app(TenantAuthorizer::class)->canAccess($client->organization_id, $user);
     }
 
     public function delete(User $user, Client $client): bool
     {
-        return $user->hasPermission('clients.delete');
+        if (! $user->hasPermission('clients.delete')) {
+            return false;
+        }
+
+        return app(TenantAuthorizer::class)->canAccess($client->organization_id, $user);
     }
 }

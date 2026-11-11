@@ -8,6 +8,7 @@ class TimecardPermissions
         'resource' => 'timecards',
         'action' => 'view',
         'description' => 'View timecards',
+        'built_in_roles' => ['User'],
     ];
 
     public const VIEW_ALL = [
@@ -20,12 +21,14 @@ class TimecardPermissions
         'resource' => 'timecards',
         'action' => 'create',
         'description' => 'Create timecards',
+        'built_in_roles' => ['User'],
     ];
 
     public const EDIT = [
         'resource' => 'timecards',
         'action' => 'edit',
         'description' => 'Edit timecards',
+        'built_in_roles' => ['User'],
     ];
 
     public const DELETE = [
@@ -38,6 +41,7 @@ class TimecardPermissions
         'resource' => 'timecards',
         'action' => 'submit',
         'description' => 'Submit timecards',
+        'built_in_roles' => ['User'],
     ];
 
     public const APPROVE = [

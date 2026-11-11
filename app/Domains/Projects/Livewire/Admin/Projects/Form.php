@@ -2,6 +2,8 @@
 
 namespace App\Domains\Projects\Livewire\Admin\Projects;
 
+use App\Core\Identity\Models\User;
+use App\Core\Tenancy\Services\TenantProjectCreation;
 use App\Domains\Accounting\Models\AccountingCode;
 use App\Domains\Addresses\Models\Address;
 use App\Domains\Clients\Models\Client;
@@ -9,6 +11,7 @@ use App\Domains\Payroll\Models\PayRateType;
 use App\Domains\Projects\Enums\ProjectStatusEnum;
 use App\Domains\Projects\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -144,7 +147,14 @@ class Form extends Component
 
         $this->authorize('create', Project::class);
 
-        Project::query()->create($validated);
+        // SaaS tenancy (§1): resolves the org from context, enforces the
+        // trial 1-project cap, and grants the creator project-admin access.
+        // No-op (plain create) when SAAS_MODE is off. Aborts 403 when the
+        // user has no org, or the trial cap is reached.
+        $creator = Auth::user();
+        abort_unless($creator instanceof User, 401);
+
+        app(TenantProjectCreation::class)->create($creator, $validated);
 
         session()->flash('success', 'Project created successfully.');
 

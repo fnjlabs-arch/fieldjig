@@ -8,6 +8,7 @@ class AnnouncementPermissions
         'resource' => 'announcements',
         'action' => 'view',
         'description' => 'View announcements',
+        'built_in_roles' => ['User'],
     ];
 
     public const CREATE = [

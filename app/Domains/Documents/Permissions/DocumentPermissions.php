@@ -8,6 +8,7 @@ class DocumentPermissions
         'resource' => 'documents',
         'action' => 'view',
         'description' => 'View documents',
+        'built_in_roles' => ['User'],
     ];
 
     public const CREATE = [

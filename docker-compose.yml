@@ -1,0 +1,215 @@
+# SadSha Build — production stack (Contabo VPS 8, shared with Massing).
+#
+# Bring up:  docker compose up -d --build
+# See docs/saas/contabo-vps8-shared.md §6. This file is the PROD shape only:
+# there is no dev overlay. Dev stays `php artisan serve` + SQLite (see the
+# clean report §2); Sail was never published in this repo (see the gap list in
+# docs/saas/contabo-vps8-shared.md §14) — this file is the first compose stack
+# the repo has ever had, so the first `up` on the VPS is still owed.
+#
+# Shared-box rules (agree with Massing's docs/saas/contabo-vps8.md):
+# - This stack owns NO public port. `web` is localhost-bound (8081); the
+#   shared Caddy below owns 80/443 and proxies to BOTH apps.
+# - Massing's own Caddy must be scaled to 0 on the shared box
+#   (`--scale caddy=0` in its up command) — two Caddys cannot both bind 80/443.
+# - MySQL 8 here, Postgres 17 there: separate databases, separate volumes,
+#   no shared credentials. Host ports never collide (Massing: 8000/8080/5432/
+#   9000/9001; here: 3306/8081, both localhost-bound).
+# - Resource limits are OFF by default on purpose (same call as Massing):
+#   a too-low cap OOM-kills a legitimate request mid-run. §10 of the guide
+#   says when to turn them on.
+services:
+  mysql:
+    # MySQL 8 — Laravel's default prod database. SQLite was dev-only
+    # (clean report §2); do not point prod at it.
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: "${DB_DATABASE:-sadsha_build}"
+      MYSQL_USER: "${DB_USERNAME:-sadsha_build}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-}"
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:-}"
+    # DB_PASSWORD / DB_ROOT_PASSWORD have no safe default on purpose: an
+    # empty password means MySQL refuses the connection and the app cannot
+    # boot open by accident. Generate both on the VPS (see the guide §4).
+    ports: ["127.0.0.1:${DB_PORT:-3306}:3306"]
+    volumes: ["mysql-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_USERNAME:-sadsha_build}", "-p${DB_PASSWORD:-}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    # deploy:                              # opt-in cap — uncomment + size for your host
+    #   resources:
+    #     limits:
+    #       memory: "${FIELDJIG_MYSQL_MEM_LIMIT:-1g}"
+
+  app:
+    # PHP 8.4-FPM (the lock file needs >= 8.4.1; Ubuntu 24.04's php8.3 does
+    # NOT satisfy it — clean report §8). No web server in this container;
+    # `web` (nginx) below talks to it over the internal network.
+    image: sadsha-build-app
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    depends_on:
+      mysql: { condition: service_healthy }
+    environment:
+      APP_NAME: "${APP_NAME:-SadSha Build}"
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: "https://${FIELDJIG_DOMAIN:-app.example.com}"
+      APP_KEY: "${APP_KEY:-}"
+      # APP_KEY is REQUIRED in prod: without it Laravel cannot encrypt
+      # sessions/cookies and the app fails closed at boot. Generate on the
+      # VPS (`docker compose exec app php artisan key:generate --show`).
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: "${DB_DATABASE:-sadsha_build}"
+      DB_USERNAME: "${DB_USERNAME:-sadsha_build}"
+      DB_PASSWORD: "${DB_PASSWORD:-}"
+      # Session / cache / queue all stay database-backed (the repo defaults
+      # in config/{session,cache,queue}.php) — no Redis needed on this box,
+      # and no extra service to keep up. The settings SQLite file lives
+      # inside the storage volume so it survives a container recreate.
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      SETTINGS_DB_PATH: /var/www/html/storage/app/settings.data
+      # --- SadSha Build SaaS (hosting prep, 2026-11-11) ---
+      # Plumbed now so the deploy doc, .env.example and the stack agree; the
+      # tenancy / billing code that reads these does NOT exist yet (Remixer
+      # Agents T/B/P own it), so empty defaults mean "SaaS features off"
+      # and change nothing today. Never put a real key in this file — values
+      # come from .env only.
+      SAAS_MODE: "${SAAS_MODE:-0}"
+      BILLING_PROVIDER: "${BILLING_PROVIDER:-lemonsqueezy}"
+      LEMONSQUEEZY_API_KEY: "${LEMONSQUEEZY_API_KEY:-}"
+      LEMONSQUEEZY_STORE_ID: "${LEMONSQUEEZY_STORE_ID:-}"
+      LEMONSQUEEZY_VARIANT_PRO: "${LEMONSQUEEZY_VARIANT_PRO:-}"
+      LEMONSQUEEZY_WEBHOOK_SECRET: "${LEMONSQUEEZY_WEBHOOK_SECRET:-}"
+      SADSHA_BUILD_PRICE_MONTHLY: "${SADSHA_BUILD_PRICE_MONTHLY:-99}"
+    volumes: ["storage-data:/var/www/html/storage"]
+    healthcheck:
+      # Boots the framework (and fails if the DB is unreachable), cheap
+      # enough at a 30s interval. The real readiness signal is the web
+      # healthcheck on /up below, which exercises app + nginx end to end.
+      test: ["CMD-SHELL", "php artisan about >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  web:
+    # Same image as `app` (it ships nginx + the built app code — see
+    # deploy/Dockerfile), running nginx instead of php-fpm. Sharing one image
+    # is what keeps the code nginx serves identical to the code php-fpm runs:
+    # a separate nginx image would have no copy of public/ at all.
+    image: sadsha-build-app
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    depends_on:
+      app: { condition: service_healthy }
+    ports: ["127.0.0.1:${FIELDJIG_WEB_PORT:-8081}:80"]
+    volumes:
+      - storage-data:/var/www/html/storage:ro
+    command: ["nginx", "-g", "daemon off;"]
+    healthcheck:
+      # /up is Laravel's built-in health route (bootstrap/app.php).
+      test: ["CMD", "curl", "-fsS", "http://localhost/up"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  queue:
+    # Queue worker — same image as `app`, no port. The app enqueues mail,
+    # notifications and scheduled jobs on the database queue; with no worker
+    # running every enqueue succeeds and nothing ever happens (same trap as
+    # Massing's worker split — see its guide §5). Do not scale this to 0.
+    image: sadsha-build-app
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    depends_on:
+      mysql: { condition: service_healthy }
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: "${APP_KEY:-}"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: "${DB_DATABASE:-sadsha_build}"
+      DB_USERNAME: "${DB_USERNAME:-sadsha_build}"
+      DB_PASSWORD: "${DB_PASSWORD:-}"
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      SETTINGS_DB_PATH: /var/www/html/storage/app/settings.data
+      SAAS_MODE: "${SAAS_MODE:-0}"
+    volumes: ["storage-data:/var/www/html/storage"]
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600"]
+    restart: unless-stopped
+
+  scheduler:
+    # Laravel scheduler (`routes/console.php` — incl. scheduler:run-dynamic-
+    # tasks). `schedule:work` ticks every minute inside this container, so no
+    # host cron entry is needed. Must never run twice: exactly one replica.
+    image: sadsha-build-app
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    depends_on:
+      mysql: { condition: service_healthy }
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: "${APP_KEY:-}"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: "${DB_DATABASE:-sadsha_build}"
+      DB_USERNAME: "${DB_USERNAME:-sadsha_build}"
+      DB_PASSWORD: "${DB_PASSWORD:-}"
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      SETTINGS_DB_PATH: /var/www/html/storage/app/settings.data
+      SAAS_MODE: "${SAAS_MODE:-0}"
+    volumes: ["storage-data:/var/www/html/storage"]
+    command: ["php", "artisan", "schedule:work"]
+    restart: unless-stopped
+
+  caddy:
+    # THE shared reverse proxy for the whole box — both apps, one Caddy.
+    # network_mode: host is deliberate, not a shortcut: both apps' web
+    # containers are bound to 127.0.0.1 (Massing 8080, Fieldjig 8081), and a
+    # bridge-networked container cannot reach a localhost-bound port via
+    # host.docker.internal (that resolves to the gateway IP, not loopback).
+    # Host networking lets this Caddy reach 127.0.0.1:8080/8081 directly,
+    # without joining either stack's network or depending on container
+    # names. It binds 80/443 on the host — which is exactly why Massing's
+    # own Caddy must be scaled to 0 on the shared box (see the header).
+    image: caddy:2
+    network_mode: host
+    environment:
+      FIELDJIG_DOMAIN: "${FIELDJIG_DOMAIN:-app.example.com}"
+      MASSING_DOMAIN: "${MASSING_DOMAIN:-app.example.com}"
+      FIELDJIG_WEB_PORT: "${FIELDJIG_WEB_PORT:-8081}"
+      MASSING_WEB_PORT: "${MASSING_WEB_PORT:-8080}"
+    volumes:
+      - ./deploy/Caddyfile.shared:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  mysql-data:      # MySQL 8 data — the production database. Backed up daily (§9).
+  storage-data:    # Laravel storage/ — uploads, documents, logs, settings.data.
+  caddy-data:      # TLS certificates + ACME account. Backed up with the rest.
+  caddy-config:

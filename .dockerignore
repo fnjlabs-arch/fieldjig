@@ -1,0 +1,15 @@
+# Keep local/dev artefacts and secrets out of the Docker build context.
+# (The Dockerfile copies the repo into the image; without this, a stray
+# local .env or vendor/ would be baked into the production image.)
+.env
+.env.*
+!.env.example
+vendor/
+node_modules/
+storage/
+bootstrap/cache/
+public/storage
+public/hot
+.git/
+.github/
+tests/

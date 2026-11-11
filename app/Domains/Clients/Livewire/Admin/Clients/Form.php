@@ -2,6 +2,7 @@
 
 namespace App\Domains\Clients\Livewire\Admin\Clients;
 
+use App\Core\Tenancy\Services\TenantContext;
 use App\Domains\Addresses\Models\Address;
 use App\Domains\Clients\Models\Client;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -118,6 +119,13 @@ class Form extends Component
             session()->flash('success', 'Client updated successfully.');
         } else {
             $this->authorize('create', Client::class);
+
+            // SaaS tenancy (§1): new clients belong to the caller's current
+            // org when one is set; legacy (null) when SaaS mode is off.
+            $context = app(TenantContext::class);
+            $validated['organization_id'] = $context->isEnabled()
+                ? $context->currentOrganizationId()
+                : null;
 
             DB::transaction(function () use ($validated, $addressesPayload): void {
                 $client = Client::query()->create($validated);

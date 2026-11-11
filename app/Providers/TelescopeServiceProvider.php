@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Core\Identity\Models\User;
+use App\Core\Tenancy\Services\TenantAuthorizer;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Telescope\IncomingEntry;
@@ -39,7 +40,10 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 
     protected function canAccessTelescope(mixed $user): bool
     {
-        return $user instanceof User && $user->isAdmin();
+        // SaaS mode (§2): Telescope is platform-operator only (raw
+        // is_admin flag), not the Admin role. When SaaS mode is off
+        // this is the unchanged isAdmin() check.
+        return $user instanceof User && TenantAuthorizer::isPlatformAreaAdmin($user);
     }
 
     /**

@@ -8,24 +8,28 @@ class TaskPermissions
         'resource' => 'tasks',
         'action' => 'view',
         'description' => 'View tasks',
+        'built_in_roles' => ['User'],
     ];
 
     public const CREATE = [
         'resource' => 'tasks',
         'action' => 'create',
         'description' => 'Create tasks',
+        'built_in_roles' => ['User'],
     ];
 
     public const EDIT = [
         'resource' => 'tasks',
         'action' => 'edit',
         'description' => 'Edit tasks',
+        'built_in_roles' => ['User'],
     ];
 
     public const EDIT_STATUS = [
         'resource' => 'tasks',
         'action' => 'edit-status',
         'description' => 'Edit task status',
+        'built_in_roles' => ['User'],
     ];
 
     public const EDIT_PRIORITY = [
@@ -44,12 +48,14 @@ class TaskPermissions
         'resource' => 'tasks',
         'action' => 'edit-progress',
         'description' => 'Edit task progress',
+        'built_in_roles' => ['User'],
     ];
 
     public const EDIT_NOTES = [
         'resource' => 'tasks',
         'action' => 'edit-notes',
         'description' => 'Edit task notes',
+        'built_in_roles' => ['User'],
     ];
 
     public const DELETE = [

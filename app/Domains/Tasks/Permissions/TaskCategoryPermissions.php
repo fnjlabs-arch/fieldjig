@@ -8,6 +8,7 @@ class TaskCategoryPermissions
         'resource' => 'task-categories',
         'action' => 'view',
         'description' => 'View task categories',
+        'built_in_roles' => ['User'],
     ];
 
     public const CREATE = [

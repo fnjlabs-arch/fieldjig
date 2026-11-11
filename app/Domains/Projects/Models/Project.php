@@ -4,6 +4,8 @@ namespace App\Domains\Projects\Models;
 
 use App\Core\Identity\Models\User;
 use App\Core\Settings\Facades\Settings;
+use App\Core\Tenancy\Models\Organization;
+use App\Core\Tenancy\Scopes\TenantScope;
 use App\Domains\Accounting\Models\AccountingCode;
 use App\Domains\Addresses\Models\Address;
 use App\Domains\ChangeOrders\Models\ChangeOrder;
@@ -55,6 +57,7 @@ class Project extends Model
         'end_date',
         'client_id',
         'address_id',
+        'organization_id',
         'project_manager_id',
         'leave_category',
         'is_active',
@@ -91,6 +94,9 @@ class Project extends Model
 
     protected static function booted(): void
     {
+        // SaaS tenancy (§1): no-op unless SAAS_MODE=1 with a tenant context.
+        static::addGlobalScope(new TenantScope);
+
         static::creating(function (Project $project): void {
             if (filled($project->project_number)) {
                 return;
@@ -176,6 +182,25 @@ class Project extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    /**
+     * Route bindings resolve WITHOUT the TenantScope so that direct access
+     * to another org's project hits the ProjectPolicy tenant gate (403)
+     * instead of vanishing as a 404. Lists still use the scope.
+     */
+    public function resolveRouteBindingQuery($query, $value, $field = null)
+    {
+        return parent::resolveRouteBindingQuery(
+            $query->withoutGlobalScope(TenantScope::class),
+            $value,
+            $field,
+        );
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     public function address(): BelongsTo

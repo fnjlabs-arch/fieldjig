@@ -8,6 +8,7 @@ class DailyPermissions
         'resource' => 'dailies',
         'action' => 'view',
         'description' => 'View daily reports',
+        'built_in_roles' => ['User'],
     ];
 
     public const VIEW_ALL = [
@@ -20,12 +21,14 @@ class DailyPermissions
         'resource' => 'dailies',
         'action' => 'create',
         'description' => 'Create daily reports',
+        'built_in_roles' => ['User'],
     ];
 
     public const EDIT = [
         'resource' => 'dailies',
         'action' => 'edit',
         'description' => 'Edit daily reports',
+        'built_in_roles' => ['User'],
     ];
 
     public const DELETE = [
@@ -38,6 +41,7 @@ class DailyPermissions
         'resource' => 'dailies',
         'action' => 'submit',
         'description' => 'Submit daily reports',
+        'built_in_roles' => ['User'],
     ];
 
     public const APPROVE = [

@@ -7,6 +7,7 @@ use App\Core\Auth\User\Observers\UserObserver;
 use App\Core\Auth\User\Policies\UserPolicy;
 use App\Core\Identity\Models\User;
 use App\Core\Identity\Permissions\UserPermissions;
+use App\Core\Tenancy\Services\TenantAuthorizer;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -39,7 +40,10 @@ class AuthUserServiceProvider extends ServiceProvider
         Gate::policy(User::class, UserPolicy::class);
 
         Gate::define('admin', function (User $user): bool {
-            return $user->isAdmin();
+            // SaaS mode (§2): the platform admin area is platform-operator
+            // only (raw is_admin flag), not the Admin role. When SaaS
+            // mode is off this is the unchanged isAdmin() check.
+            return TenantAuthorizer::isPlatformAreaAdmin($user);
         });
     }
 

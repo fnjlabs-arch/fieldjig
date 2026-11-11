@@ -1,6 +1,8 @@
 <?php
 
+use App\Core\Billing\Middleware\EnsureSubscriptionNotCanceled;
 use App\Core\Identity\Middleware\EnsurePasswordChanged;
+use App\Core\Tenancy\Middleware\ResolveTenant;
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\LoadSettings;
 use App\Http\Middleware\RedirectMobileRoutes;
@@ -44,6 +46,22 @@ return Application::configure(basePath: dirname(__DIR__))
             RedirectMobileRoutes::class,
             AddSecurityHeaders::class,
             LoadSettings::class,
+            // SaaS tenancy (§1): resolves the tenant context; no-op when
+            // SAAS_MODE is off or the request is a guest.
+            ResolveTenant::class,
+            // SaaS billing (§2): canceled orgs keep no app access except
+            // the billing panel; no-op when SAAS_MODE is off.
+            EnsureSubscriptionNotCanceled::class,
+        ]);
+
+        // Lemon Squeezy webhooks are authenticated by the X-Signature
+        // HMAC, not by a session CSRF token (§2).
+        $middleware->validateCsrfTokens(except: [
+            'billing/webhook/lemonsqueezy',
+        ]);
+
+        $middleware->alias([
+            'resolve-tenant' => ResolveTenant::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -11,6 +11,8 @@ use App\Core\Cpanel\Services\CpanelMailboxManager;
 use App\Core\Cpanel\Services\CpanelService;
 use App\Core\Identity\Models\User;
 use App\Core\Settings\Contracts\SettingsRegistryContract;
+use App\Core\Tenancy\Services\TenantAuthorizer;
+use App\Core\Tenancy\Services\TenantContext;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -79,6 +81,14 @@ class CpanelServiceProvider extends ServiceProvider
     private function registerAuthorization(): void
     {
         Gate::define('manage-email-accounts', function (User $user): bool {
+            // SaaS mode (§2): cPanel is platform-operator only. The
+            // permission fallback is NOT consulted in SaaS mode: an org
+            // owner holding the Admin role holds every permission key.
+            // When SaaS mode is off, behaviour is unchanged.
+            if (app(TenantContext::class)->isEnabled()) {
+                return TenantAuthorizer::isPlatformAdmin($user);
+            }
+
             return $user->isAdmin() || $user->hasPermission('cpanel.manage-email-accounts');
         });
     }

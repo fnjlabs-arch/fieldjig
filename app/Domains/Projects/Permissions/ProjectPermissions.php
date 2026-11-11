@@ -8,6 +8,7 @@ class ProjectPermissions
         'resource' => 'projects',
         'action' => 'view',
         'description' => 'View projects',
+        'built_in_roles' => ['User'],
     ];
 
     public const VIEW_ALL = [
@@ -44,6 +45,7 @@ class ProjectPermissions
         'resource' => 'projects',
         'action' => 'view-documents',
         'description' => 'View project documents',
+        'built_in_roles' => ['User'],
     ];
 
     public const UPLOAD_DOCUMENTS = [

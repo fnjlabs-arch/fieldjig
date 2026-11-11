@@ -9,6 +9,8 @@ use App\Core\Auth\User\Database\Factories\UserFactory;
 use App\Core\Identity\Services\UserAuthorizationSnapshotService;
 use App\Core\Notification\Models\UserNotificationPreference;
 use App\Core\Notification\Services\NotificationPreferenceService;
+use App\Core\Tenancy\Models\Organization;
+use App\Core\Tenancy\Models\OrganizationMember;
 use App\Domains\Addresses\Models\Address;
 use App\Domains\Payroll\Models\PayrollEmployeeProfile;
 use App\Domains\Payroll\Models\PayrollStatement;
@@ -32,7 +34,7 @@ use Throwable;
  *
  * @mixin IdeHelperUser
  */
-class User extends Authenticatable 
+class User extends Authenticatable
 {
     public ?string $mailboxProvisioningPassword = null;
 
@@ -118,6 +120,22 @@ class User extends Authenticatable
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'user_roles', 'user_id', 'role_id')->withTimestamps();
+    }
+
+    /**
+     * SaaS tenancy: the organizations this user belongs to. An org owner
+     * holds OrganizationMember role "owner" here — never is_admin=true.
+     */
+    public function organizationMemberships(): HasMany
+    {
+        return $this->hasMany(OrganizationMember::class);
+    }
+
+    public function organizations(): BelongsToMany
+    {
+        return $this->belongsToMany(Organization::class, 'organization_members', 'user_id', 'organization_id')
+            ->withPivot('role')
+            ->withTimestamps();
     }
 
     public function dismissedAnnouncements(): BelongsToMany
@@ -212,7 +230,6 @@ class User extends Authenticatable
 
         app(UserAuthorizationSnapshotService::class)->flush($this);
     }
-
 
     public static function bumpPermissionCacheVersion(): void
     {

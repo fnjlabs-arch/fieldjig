@@ -8,6 +8,7 @@ class ClientPermissions
         'resource' => 'clients',
         'action' => 'view',
         'description' => 'View clients',
+        'built_in_roles' => ['User'],
     ];
 
     public const CREATE = [
