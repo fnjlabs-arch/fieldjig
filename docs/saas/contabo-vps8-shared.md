@@ -19,7 +19,7 @@ on the VPS is still owed, and §12 lists exactly what it has to prove.
 | Server | Contabo **Cloud VPS 8 — €14/mo (~$16)**, **shared with Massing** | Qasim, decided |
 | Server budget | **$25/mo** (both apps together: €14 ≈ $16, inside budget) | Clean report §8 |
 | Margin | **~$83 per Fieldjig customer per month** ($99 − ~$16 server) **before support and before Massing's share of the box** | Arithmetic, not a promise — support time is the real cost |
-| Billing | Lemon Squeezy (temporary gateway; Paddle is stuck on proof-of-address) | Remixer design §2 |
+| Billing | Paddle (live gateway; Lemon Squeezy deprecated — store application rejected 2026-11-16) | Remixer design §2 |
 | Shape | One VPS, Docker Compose, Caddy for TLS — no Kubernetes, no managed database | This guide, mirroring Massing's guide |
 
 One shared box instead of two: €14/mo for both apps, versus €14 + €5.50 = €19.50
@@ -151,7 +151,7 @@ openssl rand -hex 24   # run once per password: DB_PASSWORD, DB_ROOT_PASSWORD
 
 | Variable | What it is | Notes |
 | --- | --- | --- |
-| `FIELDJIG_DOMAIN` | Public hostname for SadSha Build, e.g. `build.example.com` | **Required** — `APP_URL` is derived from it; DNS A record must already point here (§2). Placeholder `app.example.com` until the real name is chosen. |
+| `FIELDJIG_DOMAIN` | Public hostname for SadSha Build: `build.toolzo.app` (decided 2026-11-23) | **Required** — `APP_URL` is derived from it (`https://build.toolzo.app`); DNS A record must already point here (§2). Create the A record once the VPS exists (on hold until ~24–25 Nov 2026). |
 | `MASSING_DOMAIN` | Public hostname for SadSha Build Pro | **Required** — the shared Caddyfile needs both names (§7). Its value is owned by Massing's guide; keep the two guides in agreement. |
 | `FIELDJIG_WEB_PORT` | Host port for this app's nginx | Default `8081`; bound to localhost only. Massing uses `8080` — do not change either without checking §8. |
 | `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | MySQL database + user + password | Defaults `sadsha_build` / `sadsha_build`. `DB_PASSWORD` is required in prod (fail-closed — see below). |

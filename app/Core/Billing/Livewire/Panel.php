@@ -37,6 +37,13 @@ class Panel extends Component
 
     public bool $hasSubscription = false;
 
+    /**
+     * One-time Paddle customer-portal link, minted fresh on each panel
+     * load for orgs with a Paddle customer id. Null when the provider
+     * has no portal (Lemon Squeezy) or no customer exists yet.
+     */
+    public ?string $portalUrl = null;
+
     public bool $saasEnabled = false;
 
     public function mount(TenantContext $context, BillingManager $billing): void
@@ -56,6 +63,13 @@ class Panel extends Component
         $this->status = $organization->status;
         $this->hasSubscription = $organization->billing_subscription_id !== null;
         $this->trialEndsAt = $organization->trial_ends_at?->toDateString();
+
+        // Minted per page load: portal sessions are one-time and
+        // time-limited, so never cache the URL. Only for orgs that
+        // already have a provider customer id.
+        if ($this->billingConfigured && $organization->billing_customer_id !== null) {
+            $this->portalUrl = $billing->provider()->portalUrl($organization);
+        }
 
         if ($organization->status === Organization::STATUS_TRIALING && $organization->trial_ends_at !== null) {
             $this->trialDaysLeft = max(0, (int) now()->startOfDay()->diffInDays($organization->trial_ends_at->startOfDay(), false));

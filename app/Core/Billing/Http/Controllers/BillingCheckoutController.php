@@ -11,8 +11,8 @@ use Illuminate\Http\Request;
 use RuntimeException;
 
 /**
- * Starts a Lemon Squeezy checkout for the current org (§2): resolves
- * the provider checkout URL and redirects the customer to Lemon.
+ * Starts a billing checkout for the current org (§2): resolves the
+ * provider checkout URL and redirects the customer to the provider.
  */
 class BillingCheckoutController
 {
@@ -29,7 +29,7 @@ class BillingCheckoutController
             $checkoutUrl = $billing->provider()->createCheckout($organization, Organization::PLAN_PAID);
         } catch (BillingNotConfiguredException) {
             return redirect()->route('billing.panel')
-                ->withErrors(['billing' => 'Billing is not configured yet — the Lemon Squeezy variant has not been set up.']);
+                ->withErrors(['billing' => 'Billing is not configured yet — please contact the platform operator.']);
         } catch (RuntimeException) {
             return redirect()->route('billing.panel')
                 ->withErrors(['billing' => 'Checkout could not be started. Please try again.']);

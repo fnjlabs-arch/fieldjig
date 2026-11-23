@@ -1,14 +1,15 @@
 <?php
 
 use App\Core\Billing\Contracts\BillingProvider;
+use App\Core\Billing\Exceptions\BillingNotConfiguredException;
 use App\Core\Billing\Models\BillingWebhookEvent;
 use App\Core\Billing\Providers\LemonSqueezyProvider;
 use App\Core\Billing\Providers\PaddleProvider;
+use App\Core\Identity\Models\User;
 use App\Core\Tenancy\Models\Organization;
 use App\Core\Tenancy\Models\OrganizationMember;
 use App\Core\Tenancy\Services\TenantContext;
 use App\Core\Tenancy\Services\TenantProjectCreation;
-use App\Core\Identity\Models\User;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -348,17 +349,17 @@ it('blocks project creation for past_due and canceled orgs', function (): void {
     }
 });
 
-it('throws not built yet for the paddle stub', function (): void {
+it('reports paddle unconfigured without credentials', function (): void {
     $organization = Organization::factory()->create();
-    $provider = new PaddleProvider();
+    $provider = app(PaddleProvider::class);
 
     expect($provider->isConfigured())->toBeFalse();
 
     try {
         $provider->createCheckout($organization, Organization::PLAN_PAID);
-        $this->fail('Expected the Paddle stub to throw.');
-    } catch (LogicException $exception) {
-        expect($exception->getMessage())->toContain('not built yet');
+        $this->fail('Expected createCheckout to throw when Paddle is not configured.');
+    } catch (BillingNotConfiguredException $exception) {
+        expect($exception->getMessage())->toContain('Paddle is not configured');
     }
 });
 

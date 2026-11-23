@@ -14,10 +14,41 @@ provider — no live API calls in tests.
 
 | Provider | State |
 | --- | --- |
-| Lemon Squeezy (`LemonSqueezyProvider`) | Implemented (§2). Temporary gateway. |
-| Paddle (`PaddleProvider`) | **Stub only — throws "not built yet".** Paddle is STUCK on proof-of-address verification; do not build it until Paddle approves the seller account. |
+| Paddle (`PaddleProvider`) | **Implemented — the live gateway.** Product "SadSha Build" + $99/mo price created 2026-11-23 (see go-live checklist). |
+| Lemon Squeezy (`LemonSqueezyProvider`) | **Deprecated.** Store application rejected 2026-11-16. Kept only as a rollback path until Paddle is proven live; delete in a follow-up commit after cutover. |
 
-### Lemon Squeezy details (verified against Lemon docs, 2026-11-11)
+### Paddle details (verified against Paddle docs, 2026-11-23)
+
+- Checkout: the org's Paddle customer is resolved first (`POST
+  /customers {email}` when the org has no `billing_customer_id` yet),
+  then `POST /transactions {items: [{price_id, quantity: 1}],
+  customer_id, custom_data: {organization_id}}`; the checkout URL is
+  `data.checkout.url` (`<default payment link>?_ptxn=<txn id>`).
+  The price carries **NO trial period** — the 30-day trial is handled
+  in the app (org trialing at signup, 1-project cap). All Paddle API
+  calls send `Authorization: Bearer <PADDLE_API_KEY>` and
+  `Paddle-Version: 1`.
+- Webhook signature: `Paddle-Signature` header,
+  `ts=<unix>;h1=<hex>[;h1=...]`; signed payload is
+  `ts + ':' + rawBody`, HMAC-SHA256 with the webhook secret,
+  timing-safe compare against any `h1`, timestamps more than 300s old
+  rejected (same algorithm as the Toolzo Paddle worker, §5.3).
+  Event type comes from the payload `event_type` field. Verification
+  runs over `$request->getContent()` before any JSON parsing.
+- Customer portal: `POST /customers/{id}/portal-sessions`
+  (optionally `{subscription_ids: [...]}`) returns
+  `urls.general.overview` — a one-time, time-limited link; mint a
+  fresh session per click (the billing panel mints one per page load),
+  never cache it.
+- Cancel: `POST /subscriptions/{id}/cancel
+  {effective_from: "next_billing_period"}` — access runs to the end of
+  the current period; the `subscription.canceled` webhook confirms.
+  Local state is updated on the webhook, not on the cancel call.
+- Webhook route: `POST /billing/webhook/paddle`, CSRF-exempt
+  (`bootstrap/app.php` `validateCsrfTokens(except: [...])`) — authenticity
+  comes from the HMAC, not a session token.
+
+### Lemon Squeezy details (deprecated — kept for reference until deletion)
 
 - Checkout: `POST https://api.lemonsqueezy.com/v1/checkouts` (JSON:API),
   relationships store + variant, `checkout_data.custom.organization_id`
@@ -37,22 +68,34 @@ provider — no live API calls in tests.
 ### Idempotency
 
 `billing_webhook_events` (provider, `event_id` unique, `processed_at`).
-Lemon Squeezy sends no per-delivery id, so the event id is
+Paddle sends a per-delivery `event_id`, so the event id is
+`"paddle:" + event_id` — an exact replay is skipped. Lemon Squeezy
+sends no per-delivery id, so the event id is
 `"lemonsqueezy:" + sha256(raw body)` — an exact replay is skipped, a
 redelivery with different content is a new event. The unique index
 makes the skip race-safe.
 
 ### Webhook → org mapping
 
-| Lemon event | Org change |
-| --- | --- |
-| `subscription_created` / `subscription_updated` (`on_trial`) | plan trial, status trialing |
-| `subscription_updated` (`active`) | plan paid, status active, `past_due_at` cleared |
-| `subscription_updated` (`past_due` / `unpaid`) | status past_due, `past_due_at` set |
-| `subscription_cancelled` / `subscription_expired` (or status `cancelled` / `expired`) | status canceled |
-| `order_created` | records `billing_customer_id` only; plan/status unchanged |
+Paddle events are matched to an org via
+`data.custom_data.organization_id` first, then via
+`data.customer_id` matching a stored `billing_customer_id`, then via
+`data.subscription_id` matching a stored `billing_subscription_id`.
+Unmatched deliveries return 200 and are logged (Paddle retries
+non-2xx, so a transient mismatch must not 500).
 
-Events are matched to an org via `meta.custom_data.organization_id`
+| Paddle event | Org change |
+| --- | --- |
+| `subscription.created` / `subscription.updated` (`active`) | plan paid, status active, `past_due_at` cleared |
+| `subscription.updated` (`trialing`) | plan trial, status trialing (defensive — the Paddle price has no trial) |
+| `subscription.updated` / `subscription.past_due` (`past_due`) | status past_due, `past_due_at` set |
+| `subscription.paused` (`paused`) | status past_due (the app has no paused state; a resume flips it back to active) |
+| `subscription.canceled` (or status `canceled`) | status canceled |
+| `transaction.completed` / `transaction.paid` (with `subscription_id`) | records `billing_customer_id` + `billing_subscription_id`, confirms active (a successful renewal cures past_due) |
+| `transaction.completed` / `transaction.paid` (no `subscription_id`) | records `billing_customer_id` only; plan/status unchanged |
+| `transaction.payment_failed` / `transaction.past_due` | status past_due, `past_due_at` set |
+
+Lemon events are matched to an org via `meta.custom_data.organization_id`
 first, then via `data.attributes.customer_id` matching a stored
 `billing_customer_id`. Unmatched deliveries return 200 and are logged
 (Lemon retries non-2xx, so a transient mismatch must not 500).
@@ -82,10 +125,12 @@ trialing (30 days) → active (paid) → past_due → canceled
 Billing panel: Livewire `billing::panel` (`GET /billing`, auth only — no
 `verified` middleware, so a fresh trial user can pay before verifying
 email). Shows plan / status / trial days left / price. Upgrade posts to
-`POST /billing/checkout` → provider checkout URL → redirect to Lemon.
-When the Lemon variant env is absent the button is **disabled with a
+`POST /billing/checkout` → provider checkout URL → redirect to the
+provider. When the provider env is absent the button is **disabled with a
 clear "billing not configured yet" state**. Cancel posts to
-`POST /billing/cancel`.
+`POST /billing/cancel`. When the org has a Paddle customer id, a
+"Manage billing" button opens the Paddle customer portal (one-time
+link, minted per page load).
 
 ## Signup (§3)
 
@@ -153,23 +198,44 @@ admin + `SAAS_MODE=0` unchanged).
 ## Env vars
 
 Already in `.env.example` (verify, do not duplicate): `SAAS_MODE`,
-`BILLING_PROVIDER`, `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID`,
-`LEMONSQUEEZY_VARIANT_PRO`, `LEMONSQUEEZY_WEBHOOK_SECRET`,
-`SADSHA_BUILD_PRICE_MONTHLY=99`, `SADSHA_BUILD_TRIAL_DAYS=30`.
+`BILLING_PROVIDER`, `PADDLE_API_KEY`, `PADDLE_PRICE_PRO`,
+`PADDLE_WEBHOOK_SECRET`, `SADSHA_BUILD_PRICE_MONTHLY=99`,
+`SADSHA_BUILD_TRIAL_DAYS=30`. Lemon vars (`LEMONSQUEEZY_*`) are
+deprecated — kept only as a rollback path; remove after the Paddle
+cutover.
+
+## Domain (decided 2026-11-23)
+
+Launch domain: **`build.toolzo.app`** (free subdomain of toolzo.app,
+no purchase). `APP_URL=https://build.toolzo.app` on the VPS. The DNS A
+record (`build.toolzo.app` → VPS IP) can only be created once the VPS
+exists — on hold until ~24–25 Nov 2026. The Paddle webhook destination
+is `https://build.toolzo.app/billing/webhook/paddle`.
 
 ## Go-live checklist (status)
 
-1. ⏳ **BLOCKER — Lemon Squeezy approves the "Toolzo" store**
-   (currently "In Review", Test mode ON). Live billing cannot activate
-   until then. The code works in test mode.
-2. ⬜ Create the SadSha Build product + **one variant (Pro $99/mo)** in
-   the Lemon dashboard (do NOT create products/variants in code).
-3. ⬜ Set the 4 `LEMONSQUEEZY_*` env vars on the VPS.
-4. ⬜ Create the webhook in Lemon (subscription_created/updated/
-   cancelled/expired, order_created) with a signing secret.
-5. ⬜ Test-mode checkout + webhook end-to-end, then live keys.
-6. ⬜ Deploy to the shared Contabo VPS 8, then a pilot builder on one
+1. ✅ **Paddle product + price created 2026-11-23** — product "SadSha
+   Build" (`pro_01m843jze5pp0syw0c653709mc`), one price
+   (`pri_01m843khh1rzqbppp09r4gx2jj`): **$99.00 USD, Recurring, billed
+   Monthly, NO trial period, Active**, standard digital goods. Set
+   `PADDLE_PRICE_PRO=pri_01m843khh1rzqbppp09r4gx2jj` on the VPS (the
+   price id lives here in the docs and in the env var — never
+   hard-coded in app code).
+2. ⬜ Set `BILLING_PROVIDER=paddle` + the 3 `PADDLE_*` env vars on the
+   VPS (API key + webhook secret via Secure Vault, never chat/files).
+3. ⬜ Create the Paddle webhook notification destination
+   (`https://build.toolzo.app/billing/webhook/paddle`, events
+   `subscription.created/updated/canceled/past_due/paused/resumed` +
+   `transaction.completed/paid/payment_failed`) — only after the domain
+   is live over HTTPS.
+4. ⬜ Paddle sandbox test-mode checkout + webhook end-to-end, then
+   live keys.
+5. ⬜ Verify the billing panel shows Upgrade (not "not configured")
+   with `BILLING_PROVIDER=paddle`.
+6. ⬜ Deploy to the shared Contabo VPS M, then a pilot builder on one
    live project.
+7. ⬜ Delete the Lemon provider, route, config and env vars in a
+   follow-up commit AFTER Paddle is proven live.
 
 ## Follow-ups (not v1)
 
@@ -178,6 +244,7 @@ Already in `.env.example` (verify, do not duplicate): `SAAS_MODE`,
 - Full org-switcher UI (session-selected org works today).
 - Invite email for `POST /organizations/{org}/members` (v1 requires
   the user to already exist).
-- Paddle provider (only after Paddle approves the seller account).
+- Delete the Lemon Squeezy provider, route, config and env vars after
+  Paddle is proven live (see go-live checklist step 7).
 - Dashboard banner for past-due orgs (the billing panel shows the
   past-due state today).

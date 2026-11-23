@@ -54,10 +54,12 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureSubscriptionNotCanceled::class,
         ]);
 
-        // Lemon Squeezy webhooks are authenticated by the X-Signature
-        // HMAC, not by a session CSRF token (§2).
+        // Paddle webhooks are authenticated by the Paddle-Signature
+        // HMAC, Lemon Squeezy webhooks by the X-Signature HMAC, not by
+        // a session CSRF token (§2).
         $middleware->validateCsrfTokens(except: [
             'billing/webhook/lemonsqueezy',
+            'billing/webhook/paddle',
         ]);
 
         $middleware->alias([

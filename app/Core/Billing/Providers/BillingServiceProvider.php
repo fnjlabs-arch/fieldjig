@@ -4,10 +4,9 @@ namespace App\Core\Billing\Providers;
 
 use App\Core\Billing\Contracts\BillingProvider;
 use App\Core\Billing\Exceptions\BillingNotConfiguredException;
-use App\Core\Billing\Providers\LemonSqueezyProvider;
-use App\Core\Billing\Providers\PaddleProvider;
 use App\Core\Billing\Services\BillingManager;
 use App\Core\Billing\Services\LemonSqueezyWebhookHandler;
+use App\Core\Billing\Services\PaddleWebhookHandler;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
@@ -18,6 +17,7 @@ class BillingServiceProvider extends ServiceProvider
     {
         $this->app->singleton(BillingManager::class);
         $this->app->singleton(LemonSqueezyWebhookHandler::class);
+        $this->app->singleton(PaddleWebhookHandler::class);
 
         // The configured gateway. Tests override this binding with a
         // fake provider via app()->instance(BillingProvider::class, ...).

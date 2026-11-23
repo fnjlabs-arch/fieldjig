@@ -63,7 +63,7 @@
                 </flux:button>
                 @if (! $billingConfigured)
                     <p class="text-sm text-zinc-500">
-                        {{ __('Billing is not configured yet — the Lemon Squeezy variant has not been set up. Please contact the platform operator.') }}
+                        {{ __('Billing is not configured yet — please contact the platform operator.') }}
                     </p>
                 @endif
             </form>
@@ -74,6 +74,10 @@
                 @csrf
                 <flux:button type="submit" variant="ghost">{{ __('Cancel subscription') }}</flux:button>
             </form>
+        @endif
+
+        @if ($portalUrl !== null)
+            <flux:button :href="$portalUrl" target="_blank" variant="ghost">{{ __('Manage billing') }}</flux:button>
         @endif
     @endif
 </div>
